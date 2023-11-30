@@ -59,23 +59,38 @@ Status VelodyneHwInterface::RegisterScanCallback(
   return Status::OK;
 }
 
+Status VelodyneHwInterface::RegisterPacketCallback(
+  std::function<void(std::unique_ptr<velodyne_msgs::msg::VelodynePacket>)> packet_callback)
+{
+  packet_reception_callback_ = std::move(packet_callback);
+  return Status::OK;
+}
+
 void VelodyneHwInterface::ReceiveCloudPacketCallback(const std::vector<uint8_t> & buffer)
 {
   // Process current packet
   uint32_t buffer_size = buffer.size();
   std::array<uint8_t, 1206> packet_data{};
   std::copy_n(std::make_move_iterator(buffer.begin()), buffer_size, packet_data.begin());
-  velodyne_msgs::msg::VelodynePacket velodyne_packet;
-  auto now = std::chrono::system_clock::now();
-  auto now_secs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
-  auto now_nanosecs =
+
+  auto velodyne_packet_ptr = std::make_unique<velodyne_msgs::msg::VelodynePacket>();
+  const auto now = std::chrono::system_clock::now();
+  const auto now_secs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+  const auto now_nanosecs =
     std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-  velodyne_packet.data = packet_data;
-  velodyne_packet.stamp.sec = static_cast<int>(now_secs);
-  velodyne_packet.stamp.nanosec =
-    static_cast<int>((now_nanosecs / 1000000000. - static_cast<double>(now_secs)) * 1000000000);
-  scan_cloud_ptr_->packets.emplace_back(velodyne_packet);
+  velodyne_packet_ptr->data = packet_data;
+  velodyne_packet_ptr->stamp.sec = static_cast<int>(now_secs);
+  velodyne_packet_ptr->stamp.nanosec = static_cast<std::uint32_t>(now_nanosecs % 1000000000);
+
+  // Add the first packet's timestamp to the scan header
+  if (scan_cloud_ptr_->packets.empty()) {
+    scan_cloud_ptr_->header.stamp = velodyne_packet_ptr->stamp;
+  }
+
+  scan_cloud_ptr_->packets.emplace_back(*velodyne_packet_ptr);
   processed_packets_++;
+
+  packet_reception_callback_(std::move(velodyne_packet_ptr));
 
   // Check if scan is complete
   packet_first_azm_ = scan_cloud_ptr_->packets.back().data[2];  // lower word of azimuth block 0

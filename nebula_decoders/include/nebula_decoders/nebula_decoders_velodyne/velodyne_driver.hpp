@@ -30,6 +30,11 @@ private:
   /// @brief Decoder according to the model
   std::shared_ptr<drivers::VelodyneScanDecoder> scan_decoder_;
 
+  bool will_reset_pointcloud_;
+  int64_t millis_since_epoch_next_start_;
+  int32_t millis_each_publish_;
+  int32_t count_packets_since_last_publish_;
+
 public:
   VelodyneDriver() = delete;
   /// @brief Constructor
@@ -54,6 +59,12 @@ public:
   /// @return tuple of Point cloud and timestamp
   std::tuple<drivers::NebulaPointCloudPtr, double> ConvertScanToPointcloud(
     const std::shared_ptr<velodyne_msgs::msg::VelodyneScan> & velodyne_scan);
+
+  /// @brief Accumulate VelodynePacket messages to point cloud
+  /// @param velodyne_packet Message
+  /// @return optionally as tuple of Point cloud and timestamp (when the timing is right)
+  std::optional<std::tuple<drivers::NebulaPointCloudPtr, double>> AccumulatePacketToPointcloud(
+    const std::shared_ptr<velodyne_msgs::msg::VelodynePacket> & velodyne_packet);
 };
 
 }  // namespace drivers

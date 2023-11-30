@@ -5,7 +5,8 @@
   <!-- Main Container -->
   <node pkg="rclcpp_components"
         exec="component_container_mt"
-        name="pointcloud_container">
+        name="pointcloud_container"
+        output="screen">
   </node>
 
   <!--  &lt;!&ndash; Concat &ndash;&gt;-->

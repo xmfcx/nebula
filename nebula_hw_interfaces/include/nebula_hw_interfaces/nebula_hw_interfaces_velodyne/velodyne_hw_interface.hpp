@@ -44,6 +44,8 @@ private:
     is_valid_packet_; /*Lambda Function Array to verify proper packet size*/
   std::function<void(std::unique_ptr<velodyne_msgs::msg::VelodyneScan> buffer)>
     scan_reception_callback_; /**This function pointer is called when the scan is complete*/
+  std::function<void(std::unique_ptr<velodyne_msgs::msg::VelodynePacket> buffer)>
+    packet_reception_callback_; /**This function pointer is called when a packet is received*/
 
   uint16_t packet_first_azm_ = 0;
   uint16_t packet_first_azm_phased_ = 0;
@@ -138,6 +140,11 @@ public:
   /// @return Resulting status
   Status RegisterScanCallback(
     std::function<void(std::unique_ptr<velodyne_msgs::msg::VelodyneScan>)> scan_callback);
+  /// @brief Registering callback for VelodynePacket
+  /// @param packet_callback Callback function
+  /// @return Resulting status
+  Status RegisterPacketCallback(
+    std::function<void(std::unique_ptr<velodyne_msgs::msg::VelodynePacket>)> packet_callback);
 
   /// @brief Parsing JSON string to property_tree
   /// @param str JSON string

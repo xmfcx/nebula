@@ -37,8 +37,13 @@ VelodyneHwInterfaceRosWrapper::VelodyneHwInterfaceRosWrapper(const rclcpp::NodeO
   // register scan callback and publisher
   hw_interface_.RegisterScanCallback(std::bind(
     &VelodyneHwInterfaceRosWrapper::ReceiveScanDataCallback, this, std::placeholders::_1));
+  hw_interface_.RegisterPacketCallback(std::bind(
+    &VelodyneHwInterfaceRosWrapper::ReceivePacketDataCallback, this, std::placeholders::_1));
   velodyne_scan_pub_ = this->create_publisher<velodyne_msgs::msg::VelodyneScan>(
     "velodyne_packets",
+    rclcpp::SensorDataQoS(rclcpp::KeepLast(10)).best_effort().durability_volatile());
+  velodyne_packet_pub_ = this->create_publisher<velodyne_msgs::msg::VelodynePacket>(
+    "velodyne_packet",
     rclcpp::SensorDataQoS(rclcpp::KeepLast(10)).best_effort().durability_volatile());
 
   if (this->setup_sensor) {
@@ -232,6 +237,12 @@ void VelodyneHwInterfaceRosWrapper::ReceiveScanDataCallback(
   scan_buffer->header.frame_id = sensor_configuration_.frame_id;
   scan_buffer->header.stamp = scan_buffer->packets.front().stamp;
   velodyne_scan_pub_->publish(*scan_buffer);
+}
+
+void VelodyneHwInterfaceRosWrapper::ReceivePacketDataCallback(
+  std::unique_ptr<velodyne_msgs::msg::VelodynePacket> packet_buffer)
+{
+  velodyne_packet_pub_->publish(*packet_buffer);
 }
 
 std::string VelodyneHwInterfaceRosWrapper::GetPtreeValue(

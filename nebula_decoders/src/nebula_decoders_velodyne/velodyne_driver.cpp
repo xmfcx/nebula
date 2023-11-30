@@ -11,7 +11,15 @@ namespace drivers
 VelodyneDriver::VelodyneDriver(
   const std::shared_ptr<drivers::VelodyneSensorConfiguration> & sensor_configuration,
   const std::shared_ptr<drivers::VelodyneCalibrationConfiguration> & calibration_configuration)
+: will_reset_pointcloud_{true},
+  millis_each_publish_{110}
 {
+  auto time_point_now_since_epoch = std::chrono::system_clock::now().time_since_epoch();
+  long millis_since_epoch_now =
+    std::chrono::duration_cast<std::chrono::milliseconds>(time_point_now_since_epoch).count();
+  auto period = std::chrono::milliseconds(millis_each_publish_).count();
+  millis_since_epoch_next_start_ =
+    millis_since_epoch_now - (millis_since_epoch_now % period) + period;
   // initialize proper parser from cloud config's model and echo mode
   driver_status_ = nebula::Status::OK;
   std::cout << "sensor_configuration->sensor_model=" << sensor_configuration->sensor_model
@@ -62,6 +70,43 @@ std::tuple<drivers::NebulaPointCloudPtr, double> VelodyneDriver::ConvertScanToPo
     std::cout << "not ok driver_status_ = " << driver_status_ << std::endl;
   }
   return pointcloud;
+}
+
+std::optional<std::tuple<drivers::NebulaPointCloudPtr, double>> VelodyneDriver::AccumulatePacketToPointcloud(
+  const std::shared_ptr<velodyne_msgs::msg::VelodynePacket> & velodyne_packet)
+{
+  if (driver_status_ != nebula::Status::OK) {
+    std::cout << "not ok driver_status_ = " << driver_status_ << std::endl;
+    return std::nullopt;
+  }
+  std::tuple<drivers::NebulaPointCloudPtr, double> pointcloud;
+  if (will_reset_pointcloud_) {
+    scan_decoder_->reset_pointcloud(100);
+    will_reset_pointcloud_ = false;
+    count_packets_since_last_publish_ = 0;
+  }
+  scan_decoder_->unpack(*velodyne_packet);
+  count_packets_since_last_publish_++;
+
+  // put it behind a condition
+  auto time_point_now_since_epoch = std::chrono::system_clock::now().time_since_epoch();
+  long millis_since_epoch_now =
+    std::chrono::duration_cast<std::chrono::milliseconds>(time_point_now_since_epoch).count();
+
+  // Wait until the next_start time
+  if (millis_since_epoch_now >= millis_since_epoch_next_start_) {
+    pointcloud = scan_decoder_->get_pointcloud();
+    std::cout << "Log at: " << millis_since_epoch_now << " ms" << std::endl;
+    std::cout << "accumulated packet count: " << count_packets_since_last_publish_ << std::endl;
+    count_packets_since_last_publish_ = 0;
+    will_reset_pointcloud_ = true;
+    // Calculate the next multiple of millis_each_publish_ ms
+    auto period = std::chrono::milliseconds(millis_each_publish_).count();
+    millis_since_epoch_next_start_ =
+      millis_since_epoch_now - (millis_since_epoch_now % period) + period;
+    return pointcloud;
+  }
+  return std::nullopt;
 }
 Status VelodyneDriver::GetStatus() { return driver_status_; }
 

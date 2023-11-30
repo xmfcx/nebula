@@ -1,4 +1,5 @@
 #include "nebula_ros/velodyne/velodyne_decoder_ros_wrapper.hpp"
+#include <chrono>
 
 namespace nebula
 {
@@ -29,9 +30,13 @@ VelodyneDriverRosWrapper::VelodyneDriverRosWrapper(const rclcpp::NodeOptions & o
 
   RCLCPP_INFO_STREAM(this->get_logger(), this->get_name() << "Wrapper=" << wrapper_status_);
 
-  velodyne_scan_sub_ = create_subscription<velodyne_msgs::msg::VelodyneScan>(
-    "velodyne_packets", rclcpp::SensorDataQoS(),
-    std::bind(&VelodyneDriverRosWrapper::ReceiveScanMsgCallback, this, std::placeholders::_1));
+//  velodyne_scan_sub_ = create_subscription<velodyne_msgs::msg::VelodyneScan>(
+//    "velodyne_packets", rclcpp::SensorDataQoS(),
+//    std::bind(&VelodyneDriverRosWrapper::ReceiveScanMsgCallback, this, std::placeholders::_1));
+  velodyne_packet_sub_ = create_subscription<velodyne_msgs::msg::VelodynePacket>(
+    "velodyne_packet", rclcpp::SensorDataQoS().keep_last(100),
+    std::bind(&VelodyneDriverRosWrapper::ReceivePacketMsgCallback, this, std::placeholders::_1));
+
   nebula_points_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
     "velodyne_points", rclcpp::SensorDataQoS());
   aw_points_base_pub_ =
@@ -43,10 +48,7 @@ VelodyneDriverRosWrapper::VelodyneDriverRosWrapper(const rclcpp::NodeOptions & o
 void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
   const velodyne_msgs::msg::VelodyneScan::SharedPtr scan_msg)
 {
-  auto t_start = std::chrono::high_resolution_clock::now();
-
-  // take packets out of scan msg
-  std::vector<velodyne_msgs::msg::VelodynePacket> pkt_msgs = scan_msg->packets;
+  const auto t_start = std::chrono::high_resolution_clock::now();
 
   std::tuple<nebula::drivers::NebulaPointCloudPtr, double> pointcloud_ts =
     driver_ptr_->ConvertScanToPointcloud(scan_msg);
@@ -85,10 +87,139 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
     pcl::toROSMsg(*autoware_ex_cloud, *ros_pc_msg_ptr);
     ros_pc_msg_ptr->header.stamp =
       rclcpp::Time(SecondsToChronoNanoSeconds(std::get<1>(pointcloud_ts)).count());
+
+
+    std::chrono::system_clock clock_system;
+    std::chrono::time_point<std::chrono::system_clock> now = clock_system.now();
+
+    // convert header stamp to chrono time_point
+    std::chrono::time_point<std::chrono::system_clock> time_point_scan_start
+      = std::chrono::time_point<std::chrono::system_clock>(
+        std::chrono::nanoseconds(scan_msg->header.stamp.nanosec) + std::chrono::seconds(scan_msg->header.stamp.sec));
+
+
+    // get the last packet time point
+    const auto & pkt_last = scan_msg->packets.back();
+    std::chrono::time_point<std::chrono::system_clock> time_point_last_packet =
+      std::chrono::time_point<std::chrono::system_clock>(
+        std::chrono::nanoseconds(pkt_last.stamp.nanosec) +
+        std::chrono::seconds(pkt_last.stamp.sec));
+
+    // get the duration from now to the scan start
+    double duration_ms_all = std::chrono::duration_cast<std::chrono::microseconds>(now - time_point_scan_start).count() / 1000.0;
+
+
+    // get the duration from first packet to last packet
+    double duration_ms_packet = std::chrono::duration_cast<std::chrono::microseconds>(time_point_last_packet - time_point_scan_start).count() / 1000.0;
+
+    // log
+    RCLCPP_INFO(
+      get_logger(), ("total time: " + std::to_string(duration_ms_all)).c_str());
+    RCLCPP_INFO(
+      get_logger(), ("time from first pkt to last pkt: " + std::to_string(duration_ms_packet)).c_str());
+    RCLCPP_INFO(
+      get_logger(), ("processing time: " + std::to_string(duration_ms_all - duration_ms_packet)).c_str());
+
     PublishCloud(std::move(ros_pc_msg_ptr), aw_points_ex_pub_);
   }
 
-  auto runtime = std::chrono::high_resolution_clock::now() - t_start;
+  const auto runtime = std::chrono::high_resolution_clock::now() - t_start;
+  RCLCPP_DEBUG(get_logger(), "PROFILING {'d_total': %lu, 'n_out': %lu}", runtime.count(), pointcloud->size());
+}
+
+void VelodyneDriverRosWrapper::ReceivePacketMsgCallback(
+  const velodyne_msgs::msg::VelodynePacket::SharedPtr packet_msg)
+{
+  const auto t_start = std::chrono::high_resolution_clock::now();
+
+  std::optional<std::tuple<nebula::drivers::NebulaPointCloudPtr, double>> opt_pointcloud_ts =
+    driver_ptr_->AccumulatePacketToPointcloud(packet_msg);
+
+  if(opt_pointcloud_ts == std::nullopt) {
+    return;
+  }
+
+  const auto& pointcloud_ts = *opt_pointcloud_ts;
+
+  nebula::drivers::NebulaPointCloudPtr pointcloud = std::get<0>(pointcloud_ts);
+  double cloud_stamp = std::get<1>(pointcloud_ts);
+  if (pointcloud == nullptr) {
+    RCLCPP_WARN_STREAM(get_logger(), "Empty cloud parsed.");
+    return;
+  };
+
+  if (
+    nebula_points_pub_->get_subscription_count() > 0 ||
+    nebula_points_pub_->get_intra_process_subscription_count() > 0) {
+    auto ros_pc_msg_ptr = std::make_unique<sensor_msgs::msg::PointCloud2>();
+    pcl::toROSMsg(*pointcloud, *ros_pc_msg_ptr);
+    ros_pc_msg_ptr->header.stamp =
+      rclcpp::Time(SecondsToChronoNanoSeconds(std::get<1>(pointcloud_ts)).count());
+    PublishCloud(std::move(ros_pc_msg_ptr), nebula_points_pub_);
+  }
+  if (
+    aw_points_base_pub_->get_subscription_count() > 0 ||
+    aw_points_base_pub_->get_intra_process_subscription_count() > 0) {
+    const auto autoware_cloud_xyzi =
+      nebula::drivers::convertPointXYZIRCAEDTToPointXYZIR(pointcloud);
+    auto ros_pc_msg_ptr = std::make_unique<sensor_msgs::msg::PointCloud2>();
+    pcl::toROSMsg(*autoware_cloud_xyzi, *ros_pc_msg_ptr);
+    ros_pc_msg_ptr->header.stamp =
+      rclcpp::Time(SecondsToChronoNanoSeconds(std::get<1>(pointcloud_ts)).count());
+    PublishCloud(std::move(ros_pc_msg_ptr), aw_points_base_pub_);
+  }
+  if (
+    aw_points_ex_pub_->get_subscription_count() > 0 ||
+    aw_points_ex_pub_->get_intra_process_subscription_count() > 0) {
+    const auto autoware_ex_cloud =
+      nebula::drivers::convertPointXYZIRCAEDTToPointXYZIRADT(pointcloud, cloud_stamp);
+    auto ros_pc_msg_ptr = std::make_unique<sensor_msgs::msg::PointCloud2>();
+
+    // log time this took
+    std::chrono::system_clock clock_system;
+    std::chrono::time_point<std::chrono::system_clock> time_start_ = clock_system.now();
+    pcl::toROSMsg(*autoware_ex_cloud, *ros_pc_msg_ptr);
+
+    std::chrono::time_point<std::chrono::system_clock> time_end_ = clock_system.now();
+    // elapsed_milliseconds
+    std::chrono::duration<double, std::milli> elapsed_milliseconds = time_end_ - time_start_;
+    std::cout << "elapsed_milliseconds toROSMsg: " << elapsed_milliseconds.count() << std::endl;
+
+    ros_pc_msg_ptr->header.stamp =
+      rclcpp::Time(SecondsToChronoNanoSeconds(std::get<1>(pointcloud_ts)).count());
+
+
+    std::chrono::time_point<std::chrono::system_clock> now = clock_system.now();
+
+    auto time_point_scan_start = std::chrono::time_point<std::chrono::system_clock>(
+      std::chrono::nanoseconds(SecondsToChronoNanoSeconds(cloud_stamp).count()));
+
+    // get the last packet time point
+    const auto & pkt_last = *packet_msg;
+    std::chrono::time_point<std::chrono::system_clock> time_point_last_packet =
+      std::chrono::time_point<std::chrono::system_clock>(
+        std::chrono::nanoseconds(pkt_last.stamp.nanosec) +
+        std::chrono::seconds(pkt_last.stamp.sec));
+
+    // get the duration from now to the scan start
+    double duration_ms_all = std::chrono::duration_cast<std::chrono::microseconds>(now - time_point_scan_start).count() / 1000.0;
+
+
+    // get the duration from first packet to last packet
+    double duration_ms_packet = std::chrono::duration_cast<std::chrono::microseconds>(time_point_last_packet - time_point_scan_start).count() / 1000.0;
+
+    // log
+    RCLCPP_INFO(
+      get_logger(), ("total time: " + std::to_string(duration_ms_all)).c_str());
+    RCLCPP_INFO(
+      get_logger(), ("time from first pkt to last pkt: " + std::to_string(duration_ms_packet)).c_str());
+    RCLCPP_INFO(
+      get_logger(), ("processing time: " + std::to_string(duration_ms_all - duration_ms_packet)).c_str());
+
+    PublishCloud(std::move(ros_pc_msg_ptr), aw_points_ex_pub_);
+  }
+
+  const auto runtime = std::chrono::high_resolution_clock::now() - t_start;
   RCLCPP_DEBUG(get_logger(), "PROFILING {'d_total': %lu, 'n_out': %lu}", runtime.count(), pointcloud->size());
 }
 

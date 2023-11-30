@@ -52,6 +52,7 @@ class VelodyneHwInterfaceRosWrapper final : public rclcpp::Node, NebulaHwInterfa
 
   /// @brief Received Velodyne message publisher
   rclcpp::Publisher<velodyne_msgs::msg::VelodyneScan>::SharedPtr velodyne_scan_pub_;
+  rclcpp::Publisher<velodyne_msgs::msg::VelodynePacket>::SharedPtr velodyne_packet_pub_;
 
   /// @brief Initializing hardware interface ros wrapper
   /// @param sensor_configuration SensorConfiguration for this driver
@@ -61,6 +62,9 @@ class VelodyneHwInterfaceRosWrapper final : public rclcpp::Node, NebulaHwInterfa
   /// @brief Callback for receiving VelodyneScan
   /// @param scan_buffer Received VelodyneScan
   void ReceiveScanDataCallback(std::unique_ptr<velodyne_msgs::msg::VelodyneScan> scan_buffer);
+  /// @brief Callback for receiving VelodynePacket
+  /// @param scan_buffer Received VelodynePacket
+  void ReceivePacketDataCallback(std::unique_ptr<velodyne_msgs::msg::VelodynePacket> packet_buffer);
 
 public:
   explicit VelodyneHwInterfaceRosWrapper(const rclcpp::NodeOptions & options);
