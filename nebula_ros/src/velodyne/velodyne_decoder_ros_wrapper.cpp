@@ -99,12 +99,21 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
 
   std::chrono::system_clock::time_point time_now = std::chrono::system_clock::now();
 
+
+
   // log the dif
   std::chrono::duration<double> time_diff = time_now - time_first_packet_chrono;
   double time_ms = std::chrono::duration_cast<std::chrono::microseconds>(time_diff).count() * 0.001;
   RCLCPP_INFO(get_logger(), "Time diff: %f", time_ms);
 
+  sum += time_ms;
+  count++;
+  double avg = sum / count;
+
+  std::cout << avg << std::endl;
+
   auto registration_id_time_ms = log_channel_->registerValue("time_ms_before", &time_ms);
+  auto registration_id_avg = log_channel_->registerValue("avg_before", &avg);
   log_channel_->takeSnapshot();
 
   auto runtime = std::chrono::high_resolution_clock::now() - t_start;
