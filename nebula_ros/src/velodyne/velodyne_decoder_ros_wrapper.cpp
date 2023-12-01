@@ -7,7 +7,7 @@ namespace ros
 VelodyneDriverRosWrapper::VelodyneDriverRosWrapper(const rclcpp::NodeOptions & options)
 : rclcpp::Node("velodyne_driver_ros_wrapper", options)
 {
-  mcap_sink_ = std::make_shared<DataTamer::MCAPSink>("/home/mfc/data/point-cloud-sync-data-tamer/mylog.mcap");
+  mcap_sink_ = std::make_shared<DataTamer::MCAPSink>("/home/mfc/data/point-cloud-sync-data-tamer/before.mcap");
   log_channel_ = DataTamer::LogChannel::create("my_channel");
   log_channel_->addDataSink(mcap_sink_);
 
@@ -104,7 +104,7 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
   double time_ms = std::chrono::duration_cast<std::chrono::microseconds>(time_diff).count() * 0.001;
   RCLCPP_INFO(get_logger(), "Time diff: %f", time_ms);
 
-  auto registration_id_time_ms = log_channel_->registerValue("time_ms", &time_ms);
+  auto registration_id_time_ms = log_channel_->registerValue("time_ms_before", &time_ms);
   log_channel_->takeSnapshot();
 
   auto runtime = std::chrono::high_resolution_clock::now() - t_start;
