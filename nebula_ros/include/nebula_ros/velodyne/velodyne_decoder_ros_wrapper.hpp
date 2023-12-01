@@ -15,6 +15,10 @@
 #include <velodyne_msgs/msg/velodyne_packet.hpp>
 #include <velodyne_msgs/msg/velodyne_scan.hpp>
 
+#include <data_tamer/data_tamer.hpp>
+#include <data_tamer/sinks/mcap_sink.hpp>
+#include <data_tamer/channel.hpp>
+
 namespace nebula
 {
 namespace ros
@@ -31,6 +35,9 @@ class VelodyneDriverRosWrapper final : public rclcpp::Node, NebulaDriverRosWrapp
 
   std::shared_ptr<drivers::CalibrationConfigurationBase> calibration_cfg_ptr_;
   std::shared_ptr<drivers::SensorConfigurationBase> sensor_cfg_ptr_;
+
+  std::shared_ptr<DataTamer::MCAPSink> mcap_sink_;
+  std::shared_ptr<DataTamer::LogChannel> log_channel_;
 
   /// @brief Initializing ros wrapper
   /// @param sensor_configuration SensorConfiguration for this driver

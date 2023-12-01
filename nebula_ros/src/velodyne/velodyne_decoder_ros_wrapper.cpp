@@ -7,6 +7,10 @@ namespace ros
 VelodyneDriverRosWrapper::VelodyneDriverRosWrapper(const rclcpp::NodeOptions & options)
 : rclcpp::Node("velodyne_driver_ros_wrapper", options)
 {
+  mcap_sink_ = std::make_shared<DataTamer::MCAPSink>("/home/mfc/data/point-cloud-sync-data-tamer/mylog.mcap");
+  log_channel_ = DataTamer::LogChannel::create("my_channel");
+  log_channel_->addDataSink(mcap_sink_);
+
   drivers::VelodyneCalibrationConfiguration calibration_configuration;
   drivers::VelodyneSensorConfiguration sensor_configuration;
 
@@ -87,6 +91,21 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
       rclcpp::Time(SecondsToChronoNanoSeconds(std::get<1>(pointcloud_ts)).count());
     PublishCloud(std::move(ros_pc_msg_ptr), aw_points_ex_pub_);
   }
+
+
+  rclcpp::Time time_first_packet(scan_msg->packets.front().stamp);
+  std::chrono::system_clock::time_point time_first_packet_chrono(
+    std::chrono::nanoseconds(time_first_packet.nanoseconds()));
+
+  std::chrono::system_clock::time_point time_now = std::chrono::system_clock::now();
+
+  // log the dif
+  std::chrono::duration<double> time_diff = time_now - time_first_packet_chrono;
+  double time_ms = std::chrono::duration_cast<std::chrono::microseconds>(time_diff).count() * 0.001;
+  RCLCPP_INFO(get_logger(), "Time diff: %f", time_ms);
+
+  auto registration_id_time_ms = log_channel_->registerValue("time_ms", &time_ms);
+  log_channel_->takeSnapshot();
 
   auto runtime = std::chrono::high_resolution_clock::now() - t_start;
   RCLCPP_DEBUG(get_logger(), "PROFILING {'d_total': %lu, 'n_out': %lu}", runtime.count(), pointcloud->size());
