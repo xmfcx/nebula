@@ -441,9 +441,16 @@ void VelodyneHwInterfaceRosWrapper::ReceiveScanMsgCallback(
   // log the dif
   std::chrono::duration<double> time_diff = time_now - time_first_packet_chrono;
   double time_ms = std::chrono::duration_cast<std::chrono::microseconds>(time_diff).count() * 0.001;
-  RCLCPP_INFO(get_logger(), "Time diff: %f", time_ms);
+//  RCLCPP_INFO(get_logger(), "Time diff: %f", time_ms);
+
+  sum += time_ms;
+  count++;
+  double avg = sum / count;
+
+  std::cout << avg << std::endl;
 
   auto registration_id_time_ms = log_channel_->registerValue("time_ms_after", &time_ms);
+  auto registration_id_avg = log_channel_->registerValue("avg_after", &avg);
   log_channel_->takeSnapshot();
 
   auto runtime = std::chrono::high_resolution_clock::now() - t_start;

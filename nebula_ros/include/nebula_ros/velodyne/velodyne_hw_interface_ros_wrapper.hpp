@@ -89,6 +89,8 @@ class VelodyneHwInterfaceRosWrapper final : public rclcpp::Node, NebulaHwInterfa
 
   std::shared_ptr<DataTamer::MCAPSink> mcap_sink_;
   std::shared_ptr<DataTamer::LogChannel> log_channel_;
+  double sum = 0.0;
+  int count = 0;
 
   void WorkerConsumer();
 
