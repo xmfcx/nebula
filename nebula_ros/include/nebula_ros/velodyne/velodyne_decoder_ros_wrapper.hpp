@@ -15,6 +15,8 @@
 #include <velodyne_msgs/msg/velodyne_packet.hpp>
 #include <velodyne_msgs/msg/velodyne_scan.hpp>
 
+#include <mutex>
+
 namespace nebula
 {
 namespace ros
@@ -29,6 +31,8 @@ class VelodyneDriverRosWrapper final : public rclcpp::Node, NebulaDriverRosWrapp
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr nebula_points_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr aw_points_ex_pub_;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr aw_points_base_pub_;
+
+  std::mutex mutex_convert_and_publish_;
 
   std::shared_ptr<drivers::CalibrationConfigurationBase> calibration_cfg_ptr_;
   std::shared_ptr<drivers::SensorConfigurationBase> sensor_cfg_ptr_;

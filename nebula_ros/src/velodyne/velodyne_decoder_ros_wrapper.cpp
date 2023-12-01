@@ -35,7 +35,7 @@ VelodyneDriverRosWrapper::VelodyneDriverRosWrapper(const rclcpp::NodeOptions & o
 //    "velodyne_packets", rclcpp::SensorDataQoS(),
 //    std::bind(&VelodyneDriverRosWrapper::ReceiveScanMsgCallback, this, std::placeholders::_1));
   velodyne_packet_sub_ = create_subscription<velodyne_msgs::msg::VelodynePacket>(
-    "velodyne_packet", rclcpp::SensorDataQoS().keep_last(100),
+    "velodyne_packet", rclcpp::SensorDataQoS().keep_last(600),
     std::bind(&VelodyneDriverRosWrapper::ReceivePacketMsgCallback, this, std::placeholders::_1));
 
   nebula_points_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>(
@@ -180,6 +180,7 @@ void VelodyneDriverRosWrapper::ReceivePacketMsgCallback(
     aw_points_ex_pub_->get_intra_process_subscription_count() > 0) {
 
     auto convert_and_publish = [&pointcloud, cloud_stamp, this](){
+      std::lock_guard<std::mutex> lock(mutex_convert_and_publish_);
       const auto autoware_ex_cloud =
         nebula::drivers::convertPointXYZIRCAEDTToPointXYZIRADT(pointcloud, cloud_stamp);
       auto ros_pc_msg_ptr = std::make_unique<sensor_msgs::msg::PointCloud2>();
