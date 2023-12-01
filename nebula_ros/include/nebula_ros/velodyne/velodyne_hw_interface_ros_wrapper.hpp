@@ -22,6 +22,9 @@
 
 #include <future>
 #include <mutex>
+#include <data_tamer/data_tamer.hpp>
+#include <data_tamer/sinks/mcap_sink.hpp>
+#include <data_tamer/channel.hpp>
 
 namespace nebula
 {
@@ -83,6 +86,9 @@ class VelodyneHwInterfaceRosWrapper final : public rclcpp::Node, NebulaHwInterfa
   std::future<void> future_worker_;
   std::mutex mtx_queue_cv_;
   std::condition_variable cv_queue_;
+
+  std::shared_ptr<DataTamer::MCAPSink> mcap_sink_;
+  std::shared_ptr<DataTamer::LogChannel> log_channel_;
 
   void WorkerConsumer();
 
