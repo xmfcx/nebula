@@ -53,7 +53,7 @@ public:
   /// @param velodyne_scan Message
   /// @return tuple of Point cloud and timestamp
   std::tuple<drivers::NebulaPointCloudPtr, double> ConvertScanToPointcloud(
-    const std::shared_ptr<velodyne_msgs::msg::VelodyneScan> & velodyne_scan);
+    const std::unique_ptr<velodyne_msgs::msg::VelodyneScan> & velodyne_scan);
 };
 
 }  // namespace drivers

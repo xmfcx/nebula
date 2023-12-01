@@ -2,11 +2,15 @@
 #define NEBULA_VelodyneHwInterfaceRosWrapper_H
 
 #include "nebula_common/nebula_common.hpp"
+#include "nebula_common/nebula_status.hpp"
 #include "nebula_common/velodyne/velodyne_common.hpp"
+#include "nebula_decoders/nebula_decoders_velodyne/velodyne_driver.hpp"
 #include "nebula_hw_interfaces/nebula_hw_interfaces_velodyne/velodyne_hw_interface.hpp"
+#include "nebula_ros/common/nebula_driver_ros_wrapper_base.hpp"
 #include "nebula_ros/common/nebula_hw_interface_ros_wrapper_base.hpp"
 
 #include <ament_index_cpp/get_package_prefix.hpp>
+#include <diagnostic_updater/diagnostic_updater.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_components/register_node_macro.hpp>
 
@@ -14,6 +18,7 @@
 #include <velodyne_msgs/msg/velodyne_scan.hpp>
 
 #include <curl/curl.h>
+#include <readerwriterqueue/readerwritercircularbuffer.h>
 
 #include <future>
 #include <mutex>
@@ -42,7 +47,7 @@ bool get_param(const std::vector<rclcpp::Parameter> & p, const std::string & nam
 }
 
 /// @brief Hardware interface ros wrapper of velodyne driver
-class VelodyneHwInterfaceRosWrapper final : public rclcpp::Node, NebulaHwInterfaceWrapperBase
+class VelodyneHwInterfaceRosWrapper final : public rclcpp::Node, NebulaHwInterfaceWrapperBase, NebulaDriverRosWrapperBase
 {
   drivers::VelodyneHwInterface hw_interface_;
   Status interface_status_;
@@ -62,6 +67,59 @@ class VelodyneHwInterfaceRosWrapper final : public rclcpp::Node, NebulaHwInterfa
   /// @param scan_buffer Received VelodyneScan
   void ReceiveScanDataCallback(std::unique_ptr<velodyne_msgs::msg::VelodyneScan> scan_buffer);
 
+
+  std::shared_ptr<drivers::VelodyneDriver> driver_ptr_;
+  Status wrapper_status_;
+  rclcpp::Subscription<velodyne_msgs::msg::VelodyneScan>::SharedPtr velodyne_scan_sub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr nebula_points_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr aw_points_ex_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr aw_points_base_pub_;
+
+  std::shared_ptr<drivers::CalibrationConfigurationBase> calibration_cfg_ptr_;
+  std::shared_ptr<drivers::SensorConfigurationBase> sensor_cfg_ptr_;
+
+  using TypeQueue = moodycamel::BlockingReaderWriterCircularBuffer<std::unique_ptr<velodyne_msgs::msg::VelodyneScan>>;
+  std::unique_ptr<TypeQueue> queue_;
+  std::future<void> future_worker_;
+  std::mutex mtx_queue_cv_;
+  std::condition_variable cv_queue_;
+
+  void WorkerConsumer();
+
+  /// @brief Initializing ros wrapper
+  /// @param sensor_configuration SensorConfiguration for this driver
+  /// @param calibration_configuration CalibrationConfiguration for this driver
+  /// @return Resulting status
+  Status InitializeDriver(
+    std::shared_ptr<drivers::SensorConfigurationBase> sensor_configuration,
+    std::shared_ptr<drivers::CalibrationConfigurationBase> calibration_configuration) override;
+
+  /// @brief Get configurations from ros parameters
+  /// @param sensor_configuration Output of SensorConfiguration
+  /// @param calibration_configuration Output of CalibrationConfiguration
+  /// @return Resulting status
+  Status GetParameters(
+    drivers::VelodyneSensorConfiguration & sensor_configuration,
+    drivers::VelodyneCalibrationConfiguration & calibration_configuration);
+
+  /// @brief Convert seconds to chrono::nanoseconds
+  /// @param seconds
+  /// @return chrono::nanoseconds
+  static inline std::chrono::nanoseconds SecondsToChronoNanoSeconds(const double seconds)
+  {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::duration<double>(seconds));
+  }
+
+  /***
+   * Publishes a sensor_msgs::msg::PointCloud2 to the specified publisher
+   * @param pointcloud unique pointer containing the point cloud to publish
+   * @param publisher
+   */
+  void PublishCloud(
+    std::unique_ptr<sensor_msgs::msg::PointCloud2> pointcloud,
+    const rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr & publisher);
+
 public:
   explicit VelodyneHwInterfaceRosWrapper(const rclcpp::NodeOptions & options);
   /// @brief Start point cloud streaming (Call CloudInterfaceStart of HwInterface)
@@ -77,6 +135,13 @@ public:
   /// @param sensor_configuration Output of SensorConfiguration
   /// @return Resulting status
   Status GetParameters(drivers::VelodyneSensorConfiguration & sensor_configuration);
+
+  /// @brief Callback for VelodyneScan subscriber
+  /// @param scan_msg Received VelodyneScan
+  void ReceiveScanMsgCallback(const std::unique_ptr<velodyne_msgs::msg::VelodyneScan> scan_msg);
+  /// @brief Get current status of this driver
+  /// @return Current status
+  Status GetStatus();
 
 private:  // ROS Diagnostics
   /*
