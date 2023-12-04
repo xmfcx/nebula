@@ -39,6 +39,7 @@
       <arg name="frame_id" value="VLS128_TOP"/>
       <arg name="return_mode" value="SingleStrongest"/>
       <arg name="sensor_ip" value="192.168.0.215"/>
+      <arg name="host_ip" value="192.168.1.78"/>
       <arg name="data_port" value="2375"/>
       <arg name="gnss_port" value="8315"/>
     </include>
