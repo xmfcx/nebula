@@ -38,8 +38,7 @@ class VelodyneDriverRosWrapper final : public rclcpp::Node, NebulaDriverRosWrapp
 
   std::shared_ptr<DataTamer::MCAPSink> mcap_sink_;
   std::shared_ptr<DataTamer::LogChannel> log_channel_;
-  int count = 0;
-  double sum = 0.0;
+  int count_ = 0;
 
   /// @brief Initializing ros wrapper
   /// @param sensor_configuration SensorConfiguration for this driver
