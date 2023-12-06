@@ -52,10 +52,10 @@ Status VelodyneHwInterface::CloudInterfaceStart()
   return Status::OK;
 }
 
-Status VelodyneHwInterface::RegisterScanCallback(
-  std::function<void(std::unique_ptr<velodyne_msgs::msg::VelodyneScan>)> scan_callback)
+Status VelodyneHwInterface::RegisterPacketCallback(
+  std::function<void(std::unique_ptr<velodyne_msgs::msg::VelodynePacket>)> packet_callback)
 {
-  scan_reception_callback_ = std::move(scan_callback);
+  packet_reception_callback_ = std::move(packet_callback);
   return Status::OK;
 }
 
@@ -63,14 +63,17 @@ void VelodyneHwInterface::ReceiveCloudPacketCallback(const std::vector<uint8_t> 
 {
   // Process current packet
   uint32_t buffer_size = buffer.size();
-  velodyne_msgs::msg::VelodynePacket velodyne_packet;
-  std::copy_n(std::make_move_iterator(buffer.begin()), buffer_size, velodyne_packet.data.begin());
+  auto velodyne_packet = std::make_unique<velodyne_msgs::msg::VelodynePacket>();
+  std::copy_n(std::make_move_iterator(buffer.begin()), buffer_size, velodyne_packet->data.begin());
   auto now = std::chrono::system_clock::now();
   auto now_secs = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
   auto now_nanosecs =
     std::chrono::duration_cast<std::chrono::nanoseconds>(now.time_since_epoch()).count();
-  velodyne_packet.stamp.sec = static_cast<int>(now_secs);
-  velodyne_packet.stamp.nanosec = static_cast<std::uint32_t>(now_nanosecs % 1'000'000'000);
+  velodyne_packet->stamp.sec = static_cast<int>(now_secs);
+  velodyne_packet->stamp.nanosec = static_cast<std::uint32_t>(now_nanosecs % 1'000'000'000);
+
+  packet_reception_callback_(std::move(velodyne_packet));
+
   scan_cloud_ptr_->packets.emplace_back(velodyne_packet);
   processed_packets_++;
 
@@ -90,7 +93,7 @@ void VelodyneHwInterface::ReceiveCloudPacketCallback(const std::vector<uint8_t> 
       packet_last_azm_phased_ < packet_first_azm_phased_ ||
       packet_first_azm_phased_ < prev_packet_first_azm_phased_) {
       // Callback
-      scan_reception_callback_(std::move(scan_cloud_ptr_));
+      packet_reception_callback_(std::move(scan_cloud_ptr_));
       scan_cloud_ptr_ = std::make_unique<velodyne_msgs::msg::VelodyneScan>();
       processed_packets_ = 0;
     }

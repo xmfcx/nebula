@@ -75,8 +75,7 @@ VelodyneHwInterfaceRosWrapper::VelodyneHwInterfaceRosWrapper(const rclcpp::NodeO
   }
 
   // register scan callback and publisher
-  hw_interface_.RegisterScanCallback(std::bind(
-    &VelodyneHwInterfaceRosWrapper::ReceiveScanDataCallback, this, std::placeholders::_1));
+  hw_interface_.RegisterPacketCallback(std::bind(&VelodyneHwInterfaceRosWrapper::ReceivePacketCallback, this, std::placeholders::_1));
 //  velodyne_scan_pub_ = this->create_publisher<velodyne_msgs::msg::VelodyneScan>(
 //    "velodyne_packets",
 //    rclcpp::SensorDataQoS(rclcpp::KeepLast(10)).best_effort().durability_volatile());
@@ -101,9 +100,9 @@ void VelodyneHwInterfaceRosWrapper::WorkerConsumer(){
 //    RCLCPP_INFO(get_logger(), "workerconsumer loopin");
     std::unique_lock<std::mutex> lock(mtx_queue_cv_);
     cv_queue_.wait(lock);
-    std::unique_ptr<velodyne_msgs::msg::VelodyneScan> scan_buffer;
-    if (queue_->try_dequeue(scan_buffer)) {
-      ReceiveScanMsgCallback(std::move(scan_buffer));
+    std::unique_ptr<velodyne_msgs::msg::VelodynePacket> packet;
+    if (queue_->try_dequeue(packet)) {
+      ReceiveScanMsgCallback(std::move(packet));
 //      RCLCPP_INFO(get_logger(), "queue size as consume: %d", queue_->size_approx());
     }
   }
@@ -280,17 +279,12 @@ Status VelodyneHwInterfaceRosWrapper::GetParameters(
   return Status::OK;
 }
 
-void VelodyneHwInterfaceRosWrapper::ReceiveScanDataCallback(
-  std::unique_ptr<velodyne_msgs::msg::VelodyneScan> scan_buffer)
+void VelodyneHwInterfaceRosWrapper::ReceivePacketCallback(
+  std::unique_ptr<velodyne_msgs::msg::VelodynePacket> packet)
 {
-  // Publish
-  scan_buffer->header.frame_id = sensor_configuration_.frame_id;
-  scan_buffer->header.stamp = scan_buffer->packets.front().stamp;
-
-
-  if (!queue_->try_enqueue(std::move(scan_buffer))){
+  if (!queue_->try_enqueue(std::move(packet))){
     queue_->try_pop();
-    queue_->try_enqueue(std::move(scan_buffer));
+    queue_->try_enqueue(std::move(packet));
   }
   cv_queue_.notify_one();
 //  velodyne_scan_pub_->publish(*scan_buffer);
@@ -384,8 +378,8 @@ VelodyneHwInterfaceRosWrapper::updateParameters()
   return results;
 }
 
-void VelodyneHwInterfaceRosWrapper::ReceiveScanMsgCallback(
-  const std::unique_ptr<velodyne_msgs::msg::VelodyneScan> scan_msg)
+void VelodyneHwInterfaceRosWrapper::ReceivePacketMsgCallback(
+  const std::unique_ptr<velodyne_msgs::msg::VelodynePacket> msg_packet)
 {
   auto t_start = std::chrono::high_resolution_clock::now();
 
@@ -393,7 +387,7 @@ void VelodyneHwInterfaceRosWrapper::ReceiveScanMsgCallback(
 //  std::vector<velodyne_msgs::msg::VelodynePacket> pkt_msgs = scan_msg->packets;
 
   std::tuple<nebula::drivers::NebulaPointCloudPtr, double> pointcloud_ts =
-    driver_ptr_->ConvertScanToPointcloud(scan_msg);
+    driver_ptr_->AccumulatePacketToPointcloud(scan_msg);
   nebula::drivers::NebulaPointCloudPtr pointcloud = std::get<0>(pointcloud_ts);
   double cloud_stamp = std::get<1>(pointcloud_ts);
   if (pointcloud == nullptr) {

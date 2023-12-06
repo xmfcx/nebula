@@ -16,6 +16,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <optional>
 
 namespace nebula
 {
@@ -49,11 +50,11 @@ public:
   /// @return Current status
   Status GetStatus();
 
-  /// @brief Convert VelodyneScan message to point cloud
-  /// @param velodyne_scan Message
-  /// @return tuple of Point cloud and timestamp
-  std::tuple<drivers::NebulaPointCloudPtr, double> ConvertScanToPointcloud(
-    const std::unique_ptr<velodyne_msgs::msg::VelodyneScan> & velodyne_scan);
+  /// @brief Accumulate VelodynePacket messages to point cloud
+  /// @param velodyne_packet Message
+  /// @return tuple of Point cloud and timestamp_ns
+  std::optional<std::tuple<drivers::NebulaPointCloudPtr, uint64_t>> AccumulatePacketToPointcloud(
+    const std::unique_ptr<velodyne_msgs::msg::VelodynePacket> & velodyne_packet);
 };
 
 }  // namespace drivers

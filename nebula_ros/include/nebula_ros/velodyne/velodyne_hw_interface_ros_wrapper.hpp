@@ -68,7 +68,7 @@ class VelodyneHwInterfaceRosWrapper final : public rclcpp::Node, NebulaHwInterfa
     const drivers::SensorConfigurationBase & sensor_configuration) override;
   /// @brief Callback for receiving VelodyneScan
   /// @param scan_buffer Received VelodyneScan
-  void ReceiveScanDataCallback(std::unique_ptr<velodyne_msgs::msg::VelodyneScan> scan_buffer);
+  void ReceivePacketCallback(std::unique_ptr<velodyne_msgs::msg::VelodynePacket> packet);
 
 
   std::shared_ptr<drivers::VelodyneDriver> driver_ptr_;
@@ -81,7 +81,7 @@ class VelodyneHwInterfaceRosWrapper final : public rclcpp::Node, NebulaHwInterfa
   std::shared_ptr<drivers::CalibrationConfigurationBase> calibration_cfg_ptr_;
   std::shared_ptr<drivers::SensorConfigurationBase> sensor_cfg_ptr_;
 
-  using TypeQueue = moodycamel::BlockingReaderWriterCircularBuffer<std::unique_ptr<velodyne_msgs::msg::VelodyneScan>>;
+  using TypeQueue = moodycamel::BlockingReaderWriterCircularBuffer<std::unique_ptr<velodyne_msgs::msg::VelodynePacket>>;
   std::unique_ptr<TypeQueue> queue_;
   std::future<void> future_worker_;
   std::mutex mtx_queue_cv_;
@@ -145,7 +145,7 @@ public:
 
   /// @brief Callback for VelodyneScan subscriber
   /// @param scan_msg Received VelodyneScan
-  void ReceiveScanMsgCallback(const std::unique_ptr<velodyne_msgs::msg::VelodyneScan> scan_msg);
+  void ReceivePacketMsgCallback(const std::unique_ptr<velodyne_msgs::msg::VelodynePacket> msg_packet);
   /// @brief Get current status of this driver
   /// @return Current status
   Status GetStatus();
