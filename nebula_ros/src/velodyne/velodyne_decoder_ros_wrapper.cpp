@@ -44,6 +44,7 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
   const velodyne_msgs::msg::VelodyneScan::SharedPtr scan_msg)
 {
   auto t_start = std::chrono::high_resolution_clock::now();
+  auto t_start_sys = std::chrono::system_clock::now();
 
   std::tuple<nebula::drivers::NebulaPointCloudPtr, double> pointcloud_ts =
     driver_ptr_->ConvertScanToPointcloud(scan_msg);
@@ -53,6 +54,7 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
     RCLCPP_WARN_STREAM(get_logger(), "Empty cloud parsed.");
     return;
   };
+  auto t_unpacked_ = std::chrono::system_clock::now();
   if (
     nebula_points_pub_->get_subscription_count() > 0 ||
     nebula_points_pub_->get_intra_process_subscription_count() > 0) {
@@ -84,6 +86,17 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
       rclcpp::Time(SecondsToChronoNanoSeconds(std::get<1>(pointcloud_ts)).count());
     PublishCloud(std::move(ros_pc_msg_ptr), aw_points_ex_pub_);
   }
+  auto t_published_ = std::chrono::system_clock::now();
+
+  // print each event duration
+  auto duration_unpack = std::chrono::duration_cast<std::chrono::microseconds>(
+                           t_unpacked_ - t_start_sys).count() / 1000.0;
+  auto duration_publish = std::chrono::duration_cast<std::chrono::microseconds>(
+                            t_published_ - t_unpacked_).count() / 1000.0;
+
+  RCLCPP_INFO(
+    get_logger(), "PROFILING {'d_unpack': %.3f ms, 'd_publish': %.3f ms, 'points': %lu}",
+    duration_unpack, duration_publish, pointcloud->size());
 
   auto runtime = std::chrono::high_resolution_clock::now() - t_start;
   RCLCPP_DEBUG(get_logger(), "PROFILING {'d_total': %lu, 'n_out': %lu}", runtime.count(), pointcloud->size());
