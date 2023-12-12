@@ -54,7 +54,8 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
     RCLCPP_WARN_STREAM(get_logger(), "Empty cloud parsed.");
     return;
   };
-  auto t_unpacked_ = std::chrono::system_clock::now();
+  auto t_unpacked = std::chrono::high_resolution_clock::now();
+  auto t_unpacked_sys = std::chrono::system_clock::now();
   if (
     nebula_points_pub_->get_subscription_count() > 0 ||
     nebula_points_pub_->get_intra_process_subscription_count() > 0) {
@@ -86,20 +87,42 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
       rclcpp::Time(SecondsToChronoNanoSeconds(std::get<1>(pointcloud_ts)).count());
     PublishCloud(std::move(ros_pc_msg_ptr), aw_points_ex_pub_);
   }
-  auto t_published_ = std::chrono::system_clock::now();
+  auto t_published = std::chrono::high_resolution_clock::now();
+  auto t_published_sys = std::chrono::system_clock::now();
+
+  std::chrono::time_point<std::chrono::system_clock> t_first_packet(
+    std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::seconds(scan_msg->packets.front().stamp.sec) +
+      std::chrono::nanoseconds(scan_msg->packets.front().stamp.nanosec)));
+
+  std::chrono::time_point<std::chrono::system_clock> t_last_packet(
+    std::chrono::duration_cast<std::chrono::nanoseconds>(
+      std::chrono::seconds(scan_msg->packets.back().stamp.sec) +
+      std::chrono::nanoseconds(scan_msg->packets.back().stamp.nanosec)));
 
   // print each event duration
-  auto duration_unpack = std::chrono::duration_cast<std::chrono::microseconds>(
-                           t_unpacked_ - t_start_sys).count() / 1000.0;
-  auto duration_publish = std::chrono::duration_cast<std::chrono::microseconds>(
-                            t_published_ - t_unpacked_).count() / 1000.0;
+  auto duration_unpack =
+    std::chrono::duration_cast<std::chrono::microseconds>(t_unpacked - t_start).count() / 1000.0;
+  auto duration_publish =
+    std::chrono::duration_cast<std::chrono::microseconds>(t_published - t_unpacked).count() /
+    1000.0;
+  auto duration_scan =
+    std::chrono::duration_cast<std::chrono::microseconds>(t_last_packet - t_first_packet).count() /
+    1000.0;
+  auto duration_total =
+    std::chrono::duration_cast<std::chrono::microseconds>(t_published_sys - t_first_packet)
+      .count() /
+    1000.0;
 
   RCLCPP_INFO(
-    get_logger(), "PROFILING {'d_unpack': %.3f ms, 'd_publish': %.3f ms, 'points': %lu}",
-    duration_unpack, duration_publish, pointcloud->size());
+    get_logger(),
+    "PROFILING {'d_unpack': %.3f ms, 'd_publish': %.3f ms, 'points': %lu , "
+    "'d_scan': %.3f ms, 'd_total': %.3f ms}",
+    duration_unpack, duration_publish, pointcloud->size(), duration_scan, duration_total);
 
   auto runtime = std::chrono::high_resolution_clock::now() - t_start;
-  RCLCPP_DEBUG(get_logger(), "PROFILING {'d_total': %lu, 'n_out': %lu}", runtime.count(), pointcloud->size());
+  RCLCPP_DEBUG(
+    get_logger(), "PROFILING {'d_total': %lu, 'n_out': %lu}", runtime.count(), pointcloud->size());
 }
 
 void VelodyneDriverRosWrapper::PublishCloud(
@@ -124,7 +147,10 @@ Status VelodyneDriverRosWrapper::InitializeDriver(
   return driver_ptr_->GetStatus();
 }
 
-Status VelodyneDriverRosWrapper::GetStatus() { return wrapper_status_; }
+Status VelodyneDriverRosWrapper::GetStatus()
+{
+  return wrapper_status_;
+}
 
 Status VelodyneDriverRosWrapper::GetParameters(
   drivers::VelodyneSensorConfiguration & sensor_configuration,

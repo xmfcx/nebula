@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+
+<launch>
+  <arg name="host_ip" default="192.168.50.203"/>
+
+  <!-- Main Container -->
+  <node pkg="rclcpp_components"
+        exec="component_container_mt"
+        name="pointcloud_container"
+        output="screen">
+
+    <env name="LD_PRELOAD" value="libpreloaded_tlsf.so"/>
+    <env name="INITIAL_MEMPOOL_SIZE" value="100000000"/>
+    <env name="ADDITIONAL_MEMPOOL_SIZE" value="100000000"/>
+  </node>
+
+  <!--  &lt;!&ndash; Concat &ndash;&gt;-->
+  <!--  <load_composable_node target="pointcloud_container">-->
+  <!--    <composable_node pkg="pointcloud_preprocessor"-->
+  <!--                     plugin="pointcloud_preprocessor::PointCloudConcatenateDataSynchronizerComponent"-->
+  <!--                     name="concatenate_data">-->
+  <!--      <extra_arg name="use_intra_process_comms" value="true"/>-->
+
+  <!--      <remap from="output" to="concatenated/pointcloud"/>-->
+
+  <!--      <param name="output_frame" value="base_link"/>-->
+
+  <!--      <param name="input_topics" value="[-->
+  <!--      '/VLP16_BL/aw_points_ex',-->
+  <!--      '/VLP16_BR/aw_points_ex',-->
+  <!--      '/VLP16_ML/aw_points_ex',-->
+  <!--      '/VLP16_MR/aw_points_ex',-->
+  <!--      '/VLS128_TOP/aw_points_ex'-->
+  <!--      ]"/>-->
+  <!--    </composable_node>-->
+
+  <!--  </load_composable_node>-->
+
+  <!-- Lidar Drivers -->
+  <group>
+    <push-ros-namespace namespace="VLS128_TOP"/>
+    <include file="$(find-pkg-share nebula_ros)/launch/velodyne_launch_vlp16_test.xml">
+      <arg name="sensor_model" value="VLS128"/>
+      <arg name="frame_id" value="VLS128_TOP"/>
+      <arg name="return_mode" value="SingleStrongest"/>
+      <arg name="sensor_ip" value="192.168.0.215"/>
+      <arg name="data_port" value="2375"/>
+      <arg name="gnss_port" value="8315"/>
+      <arg name="host_ip" value="$(var host_ip)"/>
+    </include>
+  </group>
+
+  <!--  <group>-->
+  <!--    <push-ros-namespace namespace="VLP16_ML"/>-->
+  <!--    <include file="$(find-pkg-share nebula_ros)/launch/velodyne_launch_vlp16_test.xml">-->
+  <!--      <arg name="sensor_model" value="VLP16"/>-->
+  <!--      <arg name="frame_id" value="VLP16_ML"/>-->
+  <!--      <arg name="return_mode" value="SingleStrongest"/>-->
+  <!--      <arg name="sensor_ip" value="192.168.1.210"/>-->
+  <!--      <arg name="data_port" value="2370"/>-->
+  <!--      <arg name="gnss_port" value="8310"/>-->
+  <!--    </include>-->
+  <!--  </group>-->
+
+  <!--  <group>-->
+  <!--    <push-ros-namespace namespace="VLP16_MR"/>-->
+  <!--    <include file="$(find-pkg-share nebula_ros)/launch/velodyne_launch_vlp16_test.xml">-->
+  <!--      <arg name="sensor_model" value="VLP16"/>-->
+  <!--      <arg name="frame_id" value="VLP16_MR"/>-->
+  <!--      <arg name="return_mode" value="SingleStrongest"/>-->
+  <!--      <arg name="sensor_ip" value="192.168.1.212"/>-->
+  <!--      <arg name="data_port" value="2372"/>-->
+  <!--      <arg name="gnss_port" value="8312"/>-->
+  <!--    </include>-->
+  <!--  </group>-->
+
+  <!--  <group>-->
+  <!--    <push-ros-namespace namespace="VLP16_BR"/>-->
+  <!--    <include file="$(find-pkg-share nebula_ros)/launch/velodyne_launch_vlp16_test.xml">-->
+  <!--      <arg name="sensor_model" value="VLP16"/>-->
+  <!--      <arg name="frame_id" value="VLP16_BR"/>-->
+  <!--      <arg name="return_mode" value="SingleStrongest"/>-->
+  <!--      <arg name="sensor_ip" value="192.168.1.213"/>-->
+  <!--      <arg name="data_port" value="2373"/>-->
+  <!--      <arg name="gnss_port" value="8313"/>-->
+  <!--    </include>-->
+  <!--  </group>-->
+
+  <!--  <group>-->
+  <!--    <push-ros-namespace namespace="VLP16_BL"/>-->
+  <!--    <include file="$(find-pkg-share nebula_ros)/launch/velodyne_launch_vlp16_test.xml">-->
+  <!--      <arg name="sensor_model" value="VLP16"/>-->
+  <!--      <arg name="frame_id" value="VLP16_BL"/>-->
+  <!--      <arg name="return_mode" value="SingleStrongest"/>-->
+  <!--      <arg name="sensor_ip" value="192.168.1.214"/>-->
+  <!--      <arg name="data_port" value="2374"/>-->
+  <!--      <arg name="gnss_port" value="8314"/>-->
+  <!--    </include>-->
+  <!--  </group>-->
+
+</launch>
