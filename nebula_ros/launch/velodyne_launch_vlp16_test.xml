@@ -52,6 +52,7 @@
       <param name="frame_id" value="$(var frame_id)"/>
       <param name="scan_phase" value="$(var scan_phase)"/>
       <param name="calibration_file" value="$(var calibration_file)"/>
+      <param name="channel_name" value="without_heaphook"/>
     </composable_node>
 
   </load_composable_node>

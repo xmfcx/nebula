@@ -87,6 +87,7 @@ rclcpp_components_register_node(velodyne_hw_monitor_ros_wrapper
 ament_auto_add_library(velodyne_driver_ros_wrapper SHARED
         src/velodyne/velodyne_decoder_ros_wrapper.cpp
         )
+ament_target_dependencies(velodyne_driver_ros_wrapper data_tamer)
 rclcpp_components_register_node(velodyne_driver_ros_wrapper
         PLUGIN "VelodyneDriverRosWrapper"
         EXECUTABLE velodyne_driver_ros_wrapper_node

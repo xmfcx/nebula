@@ -9,6 +9,10 @@ VelodyneDriverRosWrapper::VelodyneDriverRosWrapper(const rclcpp::NodeOptions & o
 {
   drivers::VelodyneCalibrationConfiguration calibration_configuration;
   drivers::VelodyneSensorConfiguration sensor_configuration;
+  const auto channel_name = this->declare_parameter<std::string>("channel_name");
+  mcap_sink_ptr_ = std::make_shared<DataTamer::MCAPSink>("/home/mfc/Desktop/nebula-timings/nebula-timings.mcap");
+  channel_ptr_ = DataTamer::LogChannel::create(channel_name);
+  channel_ptr_->addDataSink(mcap_sink_ptr_);
 
   wrapper_status_ = GetParameters(sensor_configuration, calibration_configuration);
   if (Status::OK != wrapper_status_) {
@@ -119,6 +123,16 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
     "PROFILING {'d_unpack': %.3f ms, 'd_publish': %.3f ms, 'points': %lu , "
     "'d_scan': %.3f ms, 'd_total': %.3f ms}",
     duration_unpack, duration_publish, pointcloud->size(), duration_scan, duration_total);
+  const auto& cloud_size = pointcloud->size();
+
+  auto id1 = channel_ptr_->registerValue("duration_unpack", &duration_unpack);
+  auto id2 = channel_ptr_->registerValue("duration_publish", &duration_publish);
+  auto id3 = channel_ptr_->registerValue("duration_scan", &duration_scan);
+  auto id4 = channel_ptr_->registerValue("duration_total", &duration_total);
+  auto id5 = channel_ptr_->registerValue("pointcloud->size()", &cloud_size);
+
+  channel_ptr_->takeSnapshot(std::chrono::nanoseconds(count_));
+  count_++;
 
   auto runtime = std::chrono::high_resolution_clock::now() - t_start;
   RCLCPP_DEBUG(
