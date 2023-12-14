@@ -120,10 +120,10 @@ void VelodyneDriverRosWrapper::ReceiveScanMsgCallback(
 
   RCLCPP_INFO(
     get_logger(),
-    "PROFILING {'d_unpack': %.3f ms, 'd_publish': %.3f ms, 'points': %lu , "
+    "PROFILING {'count': %lu , 'd_unpack': %.3f ms, 'd_publish': %.3f ms, 'points': %lu , "
     "'d_scan': %.3f ms, 'd_total': %.3f ms}",
-    duration_unpack, duration_publish, pointcloud->size(), duration_scan, duration_total);
-  const auto& cloud_size = pointcloud->size();
+    count_, duration_unpack, duration_publish, pointcloud->size(), duration_scan, duration_total);
+  const auto & cloud_size = pointcloud->size();
 
   auto id1 = channel_ptr_->registerValue("duration_unpack", &duration_unpack);
   auto id2 = channel_ptr_->registerValue("duration_publish", &duration_publish);

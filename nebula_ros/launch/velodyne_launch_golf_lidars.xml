@@ -9,9 +9,9 @@
         name="pointcloud_container"
         output="screen">
 
-<!--    <env name="LD_PRELOAD" value="libpreloaded_tlsf.so"/>-->
-<!--    <env name="INITIAL_MEMPOOL_SIZE" value="100000000"/>-->
-<!--    <env name="ADDITIONAL_MEMPOOL_SIZE" value="100000000"/>-->
+    <env name="LD_PRELOAD" value="libpreloaded_tlsf.so"/>
+    <env name="INITIAL_MEMPOOL_SIZE" value="100000000"/>
+    <env name="ADDITIONAL_MEMPOOL_SIZE" value="100000000"/>
   </node>
 
   <!--  &lt;!&ndash; Concat &ndash;&gt;-->
